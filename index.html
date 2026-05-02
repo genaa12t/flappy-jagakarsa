@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Jagakarsa - Lompat Normal 🐦</title>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: linear-gradient(#87CEEB, #E0F7FF);
+        font-family: 'Segoe UI', sans-serif;
+        overflow: hidden;
+    }
+    canvas {
+        border: 4px solid #333;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    #score {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 50px;
+        font-weight: bold;
+        color: white;
+        text-shadow: 3px 3px 0 #000;
+        z-index: 10;
+    }
+    #startScreen, #gameOver {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.75);
+        color: white;
+        padding: 30px 50px;
+        border-radius: 20px;
+        text-align: center;
+        z-index: 100;
+    }
+    button {
+        margin-top: 20px;
+        padding: 12px 30px;
+        font-size: 20px;
+        background: #FF9800;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+    button:hover { background: #F57C00; }
+</style>
+</head>
+<body>
+
+<div id="score">0</div>
+
+<div id="startScreen">
+    <h1>🐦 Flappy Jagakarsa</h1>
+    <p>Versi Lompat Normal ✅</p>
+    <p>Klik atau tekan SPASI untuk terbang</p>
+    <button onclick="startGame()">MULAI GAME</button>
+</div>
+
+<div id="gameOver" style="display:none;">
+    <h1>Game Over 😢</h1>
+    <p>Skor kamu: <span id="finalScore">0</span></p>
+    <button onclick="restartGame()">MAIN LAGI</button>
+</div>
+
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const scoreElement = document.getElementById("score");
+const startScreen = document.getElementById("startScreen");
+const gameOverScreen = document.getElementById("gameOver");
+const finalScoreElement = document.getElementById("finalScore");
+
+let birdY = 280;
+let birdVelocity = 0;
+let gravity = 0.5;           // Gravitasi sedikit lebih tinggi
+let jumpStrength = -9.5;     // Lompatan dikurangi (tidak terlalu tinggi)
+let score = 0;
+let gameRunning = false;
+let pipes = [];
+let frame = 0;
+let gameSpeed = 2.1;
+
+const bird = { x: 100, radius: 17 };
+
+function createPipe() {
+    const gap = 175;                    // Gap cukup nyaman
+    const minTop = 100;
+    const maxTop = 310;
+    const topHeight = Math.random() * (maxTop - minTop) + minTop;
+    
+    pipes.push({
+        x: canvas.width + 30,
+        top: topHeight,
+        bottom: topHeight + gap,
+        passed: false
+    });
+}
+
+function drawBackground() {
+    ctx.fillStyle = "#87CEEB";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+    ctx.fillStyle = "#228B22";
+    ctx.fillRect(0, canvas.height - 70, canvas.width, 15);
+}
+
+function drawBird() {
+    ctx.save();
+    ctx.translate(bird.x, birdY);
+    const angle = Math.min(Math.max(birdVelocity * 3.5, -30), 60);
+    ctx.rotate(angle * Math.PI / 180);
+
+    ctx.fillStyle = "#FFEB3B";
+    ctx.beginPath();
+    ctx.arc(0, 0, bird.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#FFB300";
+    ctx.beginPath();
+    ctx.ellipse(-6, 4, 13, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(9, -7, 7, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(11, -7, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#FF5722";
+    ctx.beginPath();
+    ctx.moveTo(18, -2);
+    ctx.lineTo(27, -2);
+    ctx.lineTo(18, 4);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawPipes() {
+    for (let pipe of pipes) {
+        ctx.fillStyle = "#4CAF50";
+        ctx.fillRect(pipe.x, 0, 65, pipe.top);
+        ctx.fillStyle = "#388E3C";
+        ctx.fillRect(pipe.x - 6, pipe.top - 35, 77, 35);
+
+        ctx.fillStyle = "#4CAF50";
+        ctx.fillRect(pipe.x, pipe.bottom, 65, canvas.height - pipe.bottom);
+        ctx.fillStyle = "#388E3C";
+        ctx.fillRect(pipe.x - 6, pipe.bottom, 77, 35);
+    }
+}
+
+function update() {
+    if (!gameRunning) return;
+
+    birdVelocity += gravity;
+    birdY += birdVelocity;
+
+    for (let i = pipes.length - 1; i >= 0; i--) {
+        let p = pipes[i];
+        p.x -= gameSpeed;
+
+        // Collision
+        if (bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + 65) {
+            if (birdY - bird.radius < p.top || birdY + bird.radius > p.bottom) {
+                gameOver();
+                return;
+            }
+        }
+
+        // Scoring
+        if (!p.passed && p.x + 65 < bird.x) {
+            p.passed = true;
+            score++;
+            scoreElement.textContent = score;
+        }
+
+        if (p.x < -80) pipes.splice(i, 1);
+    }
+
+    // Batas atas & bawah
+    if (birdY + bird.radius > canvas.height - 70 || birdY - bird.radius < 15) {
+        gameOver();
+    }
+
+    frame++;
+    if (frame % 82 === 0) {
+        createPipe();
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBackground();
+    drawPipes();
+    drawBird();
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+function jump() {
+    if (gameRunning) {
+        birdVelocity = jumpStrength;
+    }
+}
+
+function startGame() {
+    startScreen.style.display = "none";
+    gameRunning = true;
+    resetGame();
+    createPipe();
+}
+
+function gameOver() {
+    gameRunning = false;
+    finalScoreElement.textContent = score;
+    gameOverScreen.style.display = "block";
+}
+
+function restartGame() {
+    gameOverScreen.style.display = "none";
+    startGame();
+}
+
+function resetGame() {
+    birdY = 280;
+    birdVelocity = 0;
+    score = 0;
+    pipes = [];
+    frame = 0;
+    scoreElement.textContent = "0";
+}
+
+// Controls
+document.addEventListener("keydown", e => {
+    if (e.code === "Space") {
+        e.preventDefault();
+        jump();
+    }
+});
+
+canvas.addEventListener("mousedown", jump);
+canvas.addEventListener("touchstart", e => {
+    e.preventDefault();
+    jump();
+});
+
+gameLoop();
+</script>
+</body>
+</html>
