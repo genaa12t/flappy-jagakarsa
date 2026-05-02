@@ -1,0 +1,49 @@
+birdVelocity = jumpStrength;
+    }
+}
+
+function startGame() {
+    startScreen.style.display = "none";
+    gameRunning = true;
+    resetGame();
+    createPipe();
+}
+
+function gameOver() {
+    gameRunning = false;
+    finalScoreElement.textContent = score;
+    gameOverScreen.style.display = "block";
+}
+
+function restartGame() {
+    gameOverScreen.style.display = "none";
+    startGame();
+}
+
+function resetGame() {
+    birdY = 280;
+    birdVelocity = 0;
+    score = 0;
+    pipes = [];
+    frame = 0;
+    scoreElement.textContent = "0";
+}
+
+// Controls
+document.addEventListener("keydown", e => {
+    if (e.code === "Space") {
+        e.preventDefault();
+        jump();
+    }
+});
+
+canvas.addEventListener("mousedown", jump);
+canvas.addEventListener("touchstart", e => {
+    e.preventDefault();
+    jump();
+});
+
+gameLoop();
+</script>
+</body>
+</html>
